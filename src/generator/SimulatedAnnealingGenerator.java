@@ -28,29 +28,31 @@ import java.util.Iterator;
  * A generator based on the simulated annealing algorithm.
  */
 public class SimulatedAnnealingGenerator extends MultiblockGenerator {
-    MenuComponentMinimalistTextBox workingMultiblockCount;
-    MenuComponentMinimalistTextBox timeout;
     MenuComponentMinimaList prioritiesList;
     MenuComponentMinimalistButton moveUp;
     MenuComponentMinimalistButton moveDown;
     MenuComponentMinimaList symmetriesList;
     MenuComponentMinimaList postProcessingEffectsList;
     MenuComponentMinimalistTextBox changeChance;
-    MenuComponentToggleBox variableRate;
     MenuComponentToggleBox lockCore;
-    MenuComponentToggleBox fillAir;
+
     private final SimulatedAnnealingGeneratorSettings settings = new SimulatedAnnealingGeneratorSettings(this);
-    private final ArrayList<Multiblock> finalMultiblocks = new ArrayList<>();
-    private final ArrayList<Multiblock> workingMultiblocks = new ArrayList<>();
-    private int index = 0;
+    private final Object currentBlockLock = new Object();
+    private CuboidalMultiblock currentBlock;
+    private final ArrayList<Multiblock> displayList = new ArrayList<>();
 
     public SimulatedAnnealingGenerator(Multiblock multiblock) {
         super(multiblock);
+
+        if (multiblock != null) {
+            currentBlock = (CuboidalMultiblock) multiblock.blankCopy();
+            displayList.add(currentBlock);
+        }
     }
 
     @Override
     public ArrayList<Multiblock>[] getMultiblockLists() {
-        return new ArrayList[]{(ArrayList) finalMultiblocks.clone(), (ArrayList) workingMultiblocks.clone()};
+        return new ArrayList[]{ displayList, new ArrayList() };
     }
 
     @Override
@@ -65,15 +67,6 @@ public class SimulatedAnnealingGenerator extends MultiblockGenerator {
 
     @Override
     public void addSettings(MenuComponentMinimaList generatorSettings, Multiblock multi) {
-        //        generatorSettings.add(new MenuComponentLabel(0, 0, 0, 32, "Final Multiblocks", true));
-        //        finalMultiblockCount = generatorSettings.add(new MenuComponentMinimalistTextBox(0, 0, 0, 32, "2",
-        //        true).setIntFilter());
-        generatorSettings.add(new MenuComponentLabel(0, 0, 0, 32, "Working Multiblocks", true));
-        workingMultiblockCount =
-                generatorSettings.add(new MenuComponentMinimalistTextBox(0, 0, 0, 32, "6", true).setIntFilter()).setTooltip("This is the number of multiblocks that are actively being worked on\nEvery thread will work on all working multiblocks");
-        generatorSettings.add(new MenuComponentLabel(0, 0, 0, 32, "Timeout (sec)", true));
-        timeout =
-                generatorSettings.add(new MenuComponentMinimalistTextBox(0, 0, 0, 32, "10", true).setIntFilter()).setTooltip("If a multiblock hasn't changed for this long, it will be reset\nThis is to avoid running into generation dead-ends");
         generatorSettings.add(new MenuComponentLabel(0, 0, 0, 32, "Priorities", true));
         prioritiesList = generatorSettings.add(new MenuComponentMinimaList(0, 0, 0, priorities.size() * 32, 24) {
             @Override
@@ -121,9 +114,7 @@ public class SimulatedAnnealingGenerator extends MultiblockGenerator {
                         100f).setSuffix("%")).setTooltip("If variable rate is on: Each iteration, each block in the " +
                         "reactor has an x% chance of changing\nIf variable rate is off: Each iteration, exactly x% of" +
                         " the blocks in the reactor will change (minimum of 1)");
-        variableRate = generatorSettings.add(new MenuComponentToggleBox(0, 0, 0, 32, "Variable Rate", true));
         lockCore = generatorSettings.add(new MenuComponentToggleBox(0, 0, 0, 32, "Lock Core", false));
-        fillAir = generatorSettings.add(new MenuComponentToggleBox(0, 0, 0, 32, "Fill Air", false));
         generatorSettings.add(new MenuComponentLabel(0, 0, 0, 32, "Symmetry Settings", true));
         ArrayList<Symmetry> symmetries = multi.getSymmetries();
         symmetriesList = generatorSettings.add(new MenuComponentMinimaList(0, 0, 0, symmetries.size() * 32, 24));
@@ -163,112 +154,75 @@ public class SimulatedAnnealingGenerator extends MultiblockGenerator {
         } else throw new IllegalArgumentException("Passed invalid settings to Simulated Annealing generator!");
     }
 
+    /**
+     * @return A copy of the current multiblock.
+     */
+    private CuboidalMultiblock getCopyOfCurrent() {
+        synchronized (currentBlockLock) {
+            return (CuboidalMultiblock) currentBlock.copy();
+        }
+    }
+
+    /**
+     * Mutates a multiblock, randomly changing the contents.
+     */
+    private void mutateMultiblock(CuboidalMultiblock cm) {
+        final var changeChance = (rand.nextDouble() * 0.75 + 0.25) * settings.getChangeChance();
+        cm.forEachInternalPosition((x, y, z) -> {
+            var b = cm.getBlock(x, y, z);
+            if (settings.lockCore && b != null && b.isCore()) return;
+            if (rand.nextDouble() < changeChance) {
+                var randBlock = rand(cm, settings.allowedBlocks);
+                if (randBlock == null || settings.lockCore && randBlock.isCore() || !cm.canBePlacedWithinCasing(randBlock))
+                    return;
+                cm.queueAction(new SetblockAction(x, y, z, applyMultiblockSpecificSettings(cm,
+                        randBlock.newInstance(x, y, z))));
+            }
+        });
+    }
+
+    /**
+     * Applies post-processing passes to the generated multiblock.
+     */
+    private void postProcessMultiblock(CuboidalMultiblock cm) {
+        cm.buildDefaultCasing();
+        cm.performActions(false);
+        for (var effect : settings.postProcessingEffects) {
+            if (effect.preSymmetry) cm.action(new PostProcessingAction(effect, settings), true, false);
+        }
+        for (var symmetry : settings.symmetries) {
+            cm.queueAction(new SymmetryAction(symmetry));
+        }
+        cm.performActions(false);
+        cm.recalculate();
+        for (var effect : settings.postProcessingEffects) {
+            if (effect.postSymmetry) cm.action(new PostProcessingAction(effect, settings), true, false);
+        }
+    }
+
+    /**
+     * @return Returns a neighbor of the current multiblock.
+     */
+    private CuboidalMultiblock getNeighbor() {
+        var cm = getCopyOfCurrent();
+        mutateMultiblock(cm);
+        postProcessMultiblock(cm);
+        return cm;
+    }
+
+    /**
+     * Replaces the current multiblock with the parameter.
+     */
+    private void acceptBlock(CuboidalMultiblock cm) {
+        currentBlock = cm;
+        displayList.set(0, cm);
+    }
+
     @Override
     public void tick() {
-        int size;
-        //<editor-fold defaultstate="collapsed" desc="Adding/removing working multiblocks">
-        synchronized (workingMultiblocks) {
-            size = workingMultiblocks.size();
-        }
-        if (size < settings.workingMultiblocks) {
-            Multiblock inst = multiblock.blankCopy();
-            inst.recalculate();
-            synchronized (workingMultiblocks) {
-                workingMultiblocks.add(inst);
-            }
-        } else if (size > settings.workingMultiblocks) {
-            synchronized (workingMultiblocks) {
-                Multiblock worst = null;
-                for (Multiblock mb : workingMultiblocks) {
-                    if (worst == null || worst.isBetterThan(mb, settings.priorities)) {
-                        worst = mb;
-                    }
-                }
-                if (worst != null) {
-                    finalize(worst);
-                    workingMultiblocks.remove(worst);
-                }
-            }
-        }
-        //</editor-fold>
-        Multiblock currentMultiblock = null;
-        int idx = index;
-        //<editor-fold defaultstate="collapsed" desc="Fetch Current multiblock">
-        synchronized (workingMultiblocks) {
-            if (idx >= workingMultiblocks.size()) idx = 0;
-            if (!workingMultiblocks.isEmpty()) {
-                currentMultiblock = workingMultiblocks.get(idx).copy();//TODO this is very laggy
-            }
-            index++;
-            if (index >= workingMultiblocks.size()) index = 0;
-        }
-        //</editor-fold>
-        if (currentMultiblock == null) return;//there's nothing to do!
-        if (settings.variableRate) {
-            final CuboidalMultiblock cm = (CuboidalMultiblock) currentMultiblock;
-            cm.forEachInternalPosition((x, y, z) -> {
-                Block b = cm.getBlock(x, y, z);
-                if (settings.lockCore && b != null && b.isCore()) return;
-                if (rand.nextDouble() < settings.getChangeChance() || (settings.fillAir && b == null)) {
-                    Block randBlock = rand(cm, settings.allowedBlocks);
-                    if (randBlock == null || settings.lockCore && randBlock.isCore() || !cm.canBePlacedWithinCasing(randBlock))
-                        return;//nope
-                    cm.queueAction(new SetblockAction(x, y, z, applyMultiblockSpecificSettings(cm,
-                            randBlock.newInstance(x, y, z))));
-                }
-            });
-            cm.buildDefaultCasing();
-        } else {
-            int changes = Math.max(1,
-                    Math.round(settings.changeChancePercent * currentMultiblock.getTotalVolume()));
-            ArrayList<int[]> pool = new ArrayList<>();
-            final CuboidalMultiblock cm = (CuboidalMultiblock) currentMultiblock;
-            cm.forEachInternalPosition((x, y, z) -> {
-                if (settings.fillAir && cm.getBlock(x, y, z) == null) {
-                    Block randBlock = rand(cm, settings.allowedBlocks);
-                    if (randBlock == null || settings.lockCore && randBlock.isCore() || !cm.canBePlacedWithinCasing(randBlock))
-                        return;//nope
-                    cm.queueAction(new SetblockAction(x, y, z, applyMultiblockSpecificSettings(cm,
-                            randBlock.newInstance(x, y, z))));
-                    return;
-                }
-                pool.add(new int[]{x, y, z});
-            });
-            cm.buildDefaultCasing();
-            for (int i = 0; i < changes; i++) {//so it can't change the same cell twice
-                if (pool.isEmpty()) break;
-                int[] pos = pool.remove(rand.nextInt(pool.size()));
-                Block b = currentMultiblock.getBlock(pos[0], pos[1], pos[2]);
-                if (settings.lockCore && b != null && b.isCore()) continue;
-                Block randBlock = rand(currentMultiblock, settings.allowedBlocks);
-                if (randBlock == null || settings.lockCore && randBlock.isCore()) continue;//nope
-                currentMultiblock.queueAction(new SetblockAction(pos[0], pos[1], pos[2],
-                        applyMultiblockSpecificSettings(currentMultiblock, randBlock.newInstance(pos[0], pos[1],
-                                pos[2]))));
-            }
-        }
-        currentMultiblock.performActions(false);
-        for (PostProcessingEffect effect : settings.postProcessingEffects) {
-            if (effect.preSymmetry) currentMultiblock.action(new PostProcessingAction(effect, settings), true, false);
-        }
-        for (Symmetry symmetry : settings.symmetries) {
-            currentMultiblock.queueAction(new SymmetryAction(symmetry));
-        }
-        currentMultiblock.performActions(false);
-        currentMultiblock.recalculate();
-        for (PostProcessingEffect effect : settings.postProcessingEffects) {
-            if (effect.postSymmetry) currentMultiblock.action(new PostProcessingAction(effect, settings), true, false);
-        }
-        synchronized (workingMultiblocks.get(idx)) {
-            Multiblock mult = workingMultiblocks.get(idx);
-            finalize(mult);
-            if (currentMultiblock.isBetterThan(mult, settings.priorities)) {
-                workingMultiblocks.set(idx, currentMultiblock.copy());
-            } else if (mult.millisSinceLastChange() > settings.timeout * 1000) {
-                Multiblock m = multiblock.blankCopy();
-                m.recalculate();
-                workingMultiblocks.set(idx, m);
-            }
+        CuboidalMultiblock neighbor = getNeighbor();
+        synchronized (currentBlockLock) {
+            acceptBlock(neighbor);
         }
         countIteration();
     }
@@ -304,35 +258,6 @@ public class SimulatedAnnealingGenerator extends MultiblockGenerator {
         return randBlock;
     }
 
-    private void finalize(Multiblock worst) {
-        if (worst == null) return;
-        synchronized (finalMultiblocks) {
-            //<editor-fold defaultstate="collapsed" desc="Adding/removing final multiblocks">
-            if (finalMultiblocks.size() < settings.finalMultiblocks) {
-                finalMultiblocks.add(worst.copy());
-                return;
-            } else if (finalMultiblocks.size() > settings.finalMultiblocks) {
-                Multiblock wrst = null;
-                for (Multiblock mb : finalMultiblocks) {
-                    if (wrst == null || wrst.isBetterThan(mb, settings.priorities)) {
-                        wrst = mb;
-                    }
-                }
-                if (wrst != null) {
-                    finalMultiblocks.remove(wrst);
-                }
-            }
-            //</editor-fold>
-            for (int i = 0; i < finalMultiblocks.size(); i++) {
-                Multiblock multi = finalMultiblocks.get(i);
-                if (worst.isBetterThan(multi, settings.priorities)) {
-                    finalMultiblocks.set(i, worst.copy());
-                    return;
-                }
-            }
-        }
-    }
-
     @Override
     public void importMultiblock(Multiblock multiblock) throws MissingConfigurationEntryException {
         multiblock.convertTo(this.multiblock.getConfiguration());
@@ -355,8 +280,7 @@ public class SimulatedAnnealingGenerator extends MultiblockGenerator {
             }
             multiblock.action(new SetblockAction(block.x, block.y, block.z, null), true, false);
         }
-        finalize(multiblock);
-        workingMultiblocks.add(multiblock.copy());
+        currentBlock = (CuboidalMultiblock) multiblock.copy();
     }
 
     private <T extends Object> T rand(Multiblock multiblock, ArrayList<Range<T>> ranges) {
