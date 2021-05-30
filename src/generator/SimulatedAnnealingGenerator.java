@@ -10,16 +10,13 @@ import multiblock.action.SymmetryAction;
 import multiblock.configuration.overhaul.fissionsfr.BlockRecipe;
 import multiblock.overhaul.fissionmsr.OverhaulMSR;
 import multiblock.overhaul.fissionsfr.OverhaulSFR;
-import multiblock.overhaul.turbine.OverhaulTurbine;
-import multiblock.ppe.PostProcessingEffect;
 import multiblock.symmetry.Symmetry;
 import multiblock.underhaul.fissionsfr.UnderhaulSFR;
 import planner.exception.MissingConfigurationEntryException;
-import planner.menu.component.*;
-import planner.menu.component.generator.MenuComponentPostProcessingEffect;
-import planner.menu.component.generator.MenuComponentPriority;
+import planner.menu.component.MenuComponentLabel;
+import planner.menu.component.MenuComponentMinimaList;
+import planner.menu.component.MenuComponentMinimalistTextBox;
 import planner.menu.component.generator.MenuComponentSymmetry;
-import simplelibrary.opengl.gui.components.MenuComponent;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -28,13 +25,9 @@ import java.util.Iterator;
  * A generator based on the simulated annealing algorithm.
  */
 public class SimulatedAnnealingGenerator extends MultiblockGenerator {
-    MenuComponentMinimaList prioritiesList;
-    MenuComponentMinimalistButton moveUp;
-    MenuComponentMinimalistButton moveDown;
     MenuComponentMinimaList symmetriesList;
-    MenuComponentMinimaList postProcessingEffectsList;
-    MenuComponentMinimalistTextBox changeChance;
-    MenuComponentToggleBox lockCore;
+    MenuComponentMinimalistTextBox maxIterations;
+    MenuComponentMinimalistTextBox changeChancePercent;
 
     private final SimulatedAnnealingGeneratorSettings settings = new SimulatedAnnealingGeneratorSettings(this);
     private final Object currentBlockLock = new Object();
@@ -52,12 +45,12 @@ public class SimulatedAnnealingGenerator extends MultiblockGenerator {
 
     @Override
     public ArrayList<Multiblock>[] getMultiblockLists() {
-        return new ArrayList[]{ displayList, new ArrayList() };
+        return new ArrayList[]{displayList, new ArrayList()};
     }
 
     @Override
     public boolean canGenerateFor(Multiblock multiblock) {
-        return multiblock instanceof CuboidalMultiblock && !(multiblock instanceof OverhaulTurbine);
+        return multiblock instanceof OverhaulSFR;
     }
 
     @Override
@@ -67,79 +60,26 @@ public class SimulatedAnnealingGenerator extends MultiblockGenerator {
 
     @Override
     public void addSettings(MenuComponentMinimaList generatorSettings, Multiblock multi) {
-        generatorSettings.add(new MenuComponentLabel(0, 0, 0, 32, "Priorities", true));
-        prioritiesList = generatorSettings.add(new MenuComponentMinimaList(0, 0, 0, priorities.size() * 32, 24) {
-            @Override
-            public void render(int millisSinceLastTick) {
-                for (simplelibrary.opengl.gui.components.MenuComponent c : components) {
-                    c.width = width - (hasVertScrollbar() ? vertScrollbarWidth : 0);
-                }
-                super.render(millisSinceLastTick);
-            }
-        });
-        refreshPriorities();
-        MenuComponent priorityButtonHolder = generatorSettings.add(new MenuComponent(0, 0, 0, 32) {
-            @Override
-            public void renderBackground() {
-                components.get(1).x = width / 2;
-                components.get(0).width = components.get(1).width = width / 2;
-                components.get(0).height = components.get(1).height = height;
-            }
-
-            @Override
-            public void render() {}
-        });
-        moveUp =
-                priorityButtonHolder.add(new MenuComponentMinimalistButton(0, 0, 0, 0, "Move Up", true, true).setTooltip("Move the selected priority up so it is more important"));
-        moveUp.addActionListener((e) -> {
-            int index = prioritiesList.getSelectedIndex();
-            if (index == -1 || index == 0) return;
-            priorities.add(index - 1, priorities.remove(index));
-            refreshPriorities();
-            prioritiesList.setSelectedIndex(index - 1);
-        });
-        moveDown =
-                priorityButtonHolder.add(new MenuComponentMinimalistButton(0, 0, 0, 0, "Move Down", true, true).setTooltip("Move the selected priority down so it is less important"));
-        moveDown.addActionListener((e) -> {
-            int index = prioritiesList.getSelectedIndex();
-            if (index == -1 || index == priorities.size() - 1) return;
-            priorities.add(index + 1, priorities.remove(index));
-            refreshPriorities();
-            prioritiesList.setSelectedIndex(index + 1);
-        });
         generatorSettings.add(new MenuComponentLabel(0, 0, 0, 32, "Generator Settings", true));
+        generatorSettings.add(new MenuComponentLabel(0, 0, 0, 24, "Max Iterations", true));
+        maxIterations =
+                generatorSettings.add(new MenuComponentMinimalistTextBox(0, 0, 0, 32, "100000", true).setIntFilter())
+                        .setTooltip("The number of iterations to execute the annealing schedule over.");
         generatorSettings.add(new MenuComponentLabel(0, 0, 0, 24, "Change Chance", true));
-        changeChance =
-                generatorSettings.add(new MenuComponentMinimalistTextBox(0, 0, 0, 32, "1", true).setFloatFilter(0f,
-                        100f).setSuffix("%")).setTooltip("If variable rate is on: Each iteration, each block in the " +
-                        "reactor has an x% chance of changing\nIf variable rate is off: Each iteration, exactly x% of" +
-                        " the blocks in the reactor will change (minimum of 1)");
-        lockCore = generatorSettings.add(new MenuComponentToggleBox(0, 0, 0, 32, "Lock Core", false));
+        changeChancePercent =
+                generatorSettings.add(new MenuComponentMinimalistTextBox(0, 0, 0, 32, "3", true).setFloatFilter(0f,
+                        100f).setSuffix("%")).setTooltip("The maximum percentage of blocks to change every iteration.");
         generatorSettings.add(new MenuComponentLabel(0, 0, 0, 32, "Symmetry Settings", true));
         ArrayList<Symmetry> symmetries = multi.getSymmetries();
         symmetriesList = generatorSettings.add(new MenuComponentMinimaList(0, 0, 0, symmetries.size() * 32, 24));
         for (Symmetry symmetry : symmetries) {
             symmetriesList.add(new MenuComponentSymmetry(symmetry));
         }
-        generatorSettings.add(new MenuComponentLabel(0, 0, 0, 32, "Post-Processing", true));
-        ArrayList<PostProcessingEffect> postProcessingEffects = multi.getPostProcessingEffects();
-        postProcessingEffectsList = generatorSettings.add(new MenuComponentMinimaList(0, 0, 0,
-                postProcessingEffects.size() * 32, 24));
-        for (PostProcessingEffect postProcessingEffect : postProcessingEffects) {
-            postProcessingEffectsList.add(new MenuComponentPostProcessingEffect(postProcessingEffect));
-        }
     }
 
     @Override
     public MultiblockGenerator newInstance(Multiblock multi) {
         return new SimulatedAnnealingGenerator(multi);
-    }
-
-    private void refreshPriorities() {
-        prioritiesList.components.clear();
-        for (Priority priority : priorities) {
-            prioritiesList.add(new MenuComponentPriority(priority));
-        }
     }
 
     @Override
@@ -154,55 +94,91 @@ public class SimulatedAnnealingGenerator extends MultiblockGenerator {
         } else throw new IllegalArgumentException("Passed invalid settings to Simulated Annealing generator!");
     }
 
-    /**
-     * @return A copy of the current multiblock.
-     */
     private CuboidalMultiblock getCopyOfCurrent() {
         synchronized (currentBlockLock) {
             return (CuboidalMultiblock) currentBlock.copy();
         }
     }
 
-    /**
-     * Mutates a multiblock, randomly changing the contents.
-     */
     private void mutateMultiblock(CuboidalMultiblock cm) {
-        final var changeChance = (rand.nextDouble() * 0.75 + 0.25) * settings.getChangeChance();
+        final var changeChance = rand.nextDouble() * settings.changeChance;
+        cm.forEachCasingPosition((x, y, z) -> {
+            if (rand.nextDouble() < changeChance) {
+                Block randBlock = null;
+                var typeChance = rand.nextDouble();
+                if (typeChance <= 0.1) {
+                    randBlock = choice(settings.casingSources);
+                } else if (typeChance <= 1.0) {
+                    randBlock = choice(settings.casingGlass);
+                };
+
+                if (randBlock == null || cm.canBePlacedWithinCasing(randBlock)) return;
+                var out = applyMultiblockSpecificSettings(cm, randBlock.newInstance(x, y, z));
+                cm.queueAction(new SetblockAction(x, y, z, out));
+            }
+        });
         cm.forEachInternalPosition((x, y, z) -> {
             var b = cm.getBlock(x, y, z);
-            if (settings.lockCore && b != null && b.isCore()) return;
             if (rand.nextDouble() < changeChance) {
-                var randBlock = rand(cm, settings.allowedBlocks);
-                if (randBlock == null || settings.lockCore && randBlock.isCore() || !cm.canBePlacedWithinCasing(randBlock))
-                    return;
-                cm.queueAction(new SetblockAction(x, y, z, applyMultiblockSpecificSettings(cm,
-                        randBlock.newInstance(x, y, z))));
+                Block randBlock = null;
+                var typeChance = rand.nextDouble();
+                if (typeChance <= 0.5) {
+                    // Place moderator 50% of the time.
+                    randBlock = choice(settings.moderators);
+                } else if (typeChance <= 0.8) {
+                    // Place heat sinks 30% of the time.
+                    randBlock = choice(settings.heatSinks);
+                } else if (typeChance <= 0.85) {
+                    // Place heat sinks 5% of the time.
+                    randBlock = choice(settings.conductors);
+                } else if (typeChance <= 0.9) {
+                    // Place reflectors 5% of the time.
+                    randBlock = choice(settings.reflectors);
+                } else if (typeChance <= 0.95) {
+                    // Place nothing 5% of the time.
+                    randBlock = null;
+                } else if (typeChance <= 1.0) {
+                    // Place fuel cells 5% of the time.
+                    randBlock = choice(settings.fuelCell);
+                };
+
+                if (randBlock == null) cm.queueAction(new SetblockAction(x, y, z, null));
+                else if (cm.canBePlacedWithinCasing(randBlock)) {
+                    var out = applyMultiblockSpecificSettings(cm, randBlock.newInstance(x, y, z));
+                    cm.queueAction(new SetblockAction(x, y, z, out));
+                }
             }
         });
     }
 
-    /**
-     * Applies post-processing passes to the generated multiblock.
-     */
+    private void removeInvalidPass(CuboidalMultiblock cm) {
+        cm.forEachCasingPosition((x, y, z) -> {
+            var block = cm.getBlock(x, y, z);
+            if (block != null && !cm.getBlock(x, y, z).isValid())
+                cm.queueAction(new SetblockAction(x, y, z, settings.casingGlass.get(0)));
+        });
+        cm.forEachInternalPosition((x, y, z) -> {
+            var block = cm.getBlock(x, y, z);
+            if (block != null && !block.isValid())
+                cm.queueAction(new SetblockAction(x, y, z, null));
+        });
+    }
+
     private void postProcessMultiblock(CuboidalMultiblock cm) {
         cm.buildDefaultCasing();
         cm.performActions(false);
-        for (var effect : settings.postProcessingEffects) {
-            if (effect.preSymmetry) cm.action(new PostProcessingAction(effect, settings), true, false);
-        }
         for (var symmetry : settings.symmetries) {
             cm.queueAction(new SymmetryAction(symmetry));
         }
         cm.performActions(false);
         cm.recalculate();
-        for (var effect : settings.postProcessingEffects) {
-            if (effect.postSymmetry) cm.action(new PostProcessingAction(effect, settings), true, false);
+        if (iterations > settings.maxIterations) {
+            removeInvalidPass(cm);
+            cm.performActions(false);
+            cm.recalculate();
         }
     }
 
-    /**
-     * @return Returns a neighbor of the current multiblock.
-     */
     private CuboidalMultiblock getNeighbor() {
         var cm = getCopyOfCurrent();
         mutateMultiblock(cm);
@@ -210,20 +186,48 @@ public class SimulatedAnnealingGenerator extends MultiblockGenerator {
         return cm;
     }
 
-    /**
-     * Replaces the current multiblock with the parameter.
-     */
-    private void acceptBlock(CuboidalMultiblock cm) {
-        currentBlock = cm;
-        displayList.set(0, cm);
+    private static double lerp(double a, double b, double f) {
+        return a + f * (b - a);
+    }
+    private double temperature() {
+        return 1.0 - Math.min((double) iterations / (double) settings.maxIterations, 1.0);
+    }
+    private double scoreAcceptance(double oldScore, double newScore) {
+        var temperature = temperature();
+        var modifiedTemperature = 1.0 - ((1.0 - temperature) * (1.0 - temperature));
+        if (oldScore <= newScore) return 1.0;
+        else return Math.max(0.0, 1.0 - (oldScore - newScore) / lerp(2, 6, modifiedTemperature)) * temperature;
+    }
+
+    private double scoreMultiblock(CuboidalMultiblock cm) {
+        if (cm instanceof OverhaulSFR) {
+            var sfr = (OverhaulSFR) cm;
+
+            var outputFactor = Math.log(sfr.totalOutput + 1) + sfr.totalEfficiency * 7.5;
+            var noOutputPenalty = 1 / (sfr.totalOutput + 0.0005);
+            var heatPenalty = sfr.netHeat > 0 ? 10.0 + Math.sqrt(sfr.netHeat) : 0;
+
+            return outputFactor - noOutputPenalty - heatPenalty;
+        } else {
+            throw new RuntimeException("Cannot use Simulated Annealing for type: " + cm.getClass().getName());
+        }
+    }
+
+    private void checkAccepted(CuboidalMultiblock cm) {
+        synchronized (currentBlockLock) {
+            double acceptance = scoreAcceptance(scoreMultiblock(currentBlock), scoreMultiblock(cm));
+            System.out.println("t: "+temperature()+", ns: "+scoreMultiblock(cm)+", os: "+scoreMultiblock(currentBlock)+", acc: "+acceptance);
+            if (rand.nextDouble() <= acceptance) {
+                currentBlock = cm;
+                displayList.set(0, cm);
+            }
+        }
     }
 
     @Override
     public void tick() {
         CuboidalMultiblock neighbor = getNeighbor();
-        synchronized (currentBlockLock) {
-            acceptBlock(neighbor);
-        }
+        checkAccepted(neighbor);
         countIteration();
     }
 
@@ -281,6 +285,10 @@ public class SimulatedAnnealingGenerator extends MultiblockGenerator {
             multiblock.action(new SetblockAction(block.x, block.y, block.z, null), true, false);
         }
         currentBlock = (CuboidalMultiblock) multiblock.copy();
+    }
+
+    private <T extends Object> T choice(ArrayList<T> array) {
+        return array.get(rand.nextInt(array.size()));
     }
 
     private <T extends Object> T rand(Multiblock multiblock, ArrayList<Range<T>> ranges) {
