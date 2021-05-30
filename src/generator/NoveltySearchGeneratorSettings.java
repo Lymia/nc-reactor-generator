@@ -7,11 +7,11 @@ import planner.menu.component.generator.MenuComponentSymmetry;
 
 import java.util.ArrayList;
 
-public class SimulatedAnnealingGeneratorSettings implements Settings {
+public class NoveltySearchGeneratorSettings implements Settings {
     public ArrayList<Symmetry> symmetries = new ArrayList<>();
     public ArrayList<Range<Block>> allowedBlocks = new ArrayList<>();
-    public float changeChance;
-    public int maxIterations;
+    public int populationSize;
+    public double archiveThreshold, changeChance, createAdjacentChance, createChance;
 
     public ArrayList<Block> fuelCell = new ArrayList<>();
     public ArrayList<Block> moderators = new ArrayList<>();
@@ -21,17 +21,22 @@ public class SimulatedAnnealingGeneratorSettings implements Settings {
     public ArrayList<Block> casingGlass = new ArrayList<>();
     public ArrayList<Block> conductors = new ArrayList<>();
 
-    private final SimulatedAnnealingGenerator generator;
+    private final NoveltySearchGenerator generator;
 
-    public SimulatedAnnealingGeneratorSettings(SimulatedAnnealingGenerator generator) {
+    public NoveltySearchGeneratorSettings(NoveltySearchGenerator generator) {
         this.generator = generator;
     }
 
-    public void refresh(SimulatedAnnealingGeneratorSettings settings) {
+    public void refresh(NoveltySearchGeneratorSettings settings) {
         allowedBlocks = settings.allowedBlocks;
         symmetries = settings.symmetries;
+
+        populationSize = settings.populationSize;
+        archiveThreshold = settings.archiveThreshold;
+
         changeChance = settings.changeChance;
-        maxIterations = settings.maxIterations;
+        createAdjacentChance = settings.createAdjacentChance;
+        createChance = settings.createChance;
 
         fuelCell = settings.fuelCell;
         moderators = settings.moderators;
@@ -71,7 +76,10 @@ public class SimulatedAnnealingGeneratorSettings implements Settings {
         }
         symmetries = newSymmetries;
         changeChance = Float.parseFloat(generator.changeChancePercent.text) / 100;
-        maxIterations = Integer.parseInt(generator.maxIterations.text);
+        archiveThreshold = Float.parseFloat(generator.archiveNoveltyThreshold.text);
+        createAdjacentChance = Float.parseFloat(generator.createAdjacentChancePercent.text) / 100;
+        createChance = Float.parseFloat(generator.createChancePercent.text) / 100;
+        populationSize = Integer.parseInt(generator.populationSize.text);
     }
 
     @Override
