@@ -8,8 +8,6 @@ import multiblock.Range;
 import multiblock.action.PostProcessingAction;
 import multiblock.action.SetblockAction;
 import multiblock.action.SymmetryAction;
-import multiblock.overhaul.fissionmsr.OverhaulMSR;
-import multiblock.overhaul.fissionsfr.OverhaulSFR;
 import multiblock.overhaul.turbine.OverhaulTurbine;
 import multiblock.ppe.PostProcessingEffect;
 import multiblock.symmetry.Symmetry;
@@ -24,7 +22,7 @@ import planner.menu.component.generator.MenuComponentPostProcessingEffect;
 import planner.menu.component.generator.MenuComponentPriority;
 import planner.menu.component.generator.MenuComponentSymmetry;
 import simplelibrary.opengl.gui.components.MenuComponent;
-public class CoreBasedGenerator extends MultiblockGenerator{
+public class CoreBasedGenerator extends ReactorGeneratorCommon {
     MenuComponentMinimalistTextBox finalMultiblockCount;
     MenuComponentMinimalistTextBox workingMultiblockCount;
     MenuComponentMinimalistTextBox finalCoreCount;
@@ -195,6 +193,12 @@ public class CoreBasedGenerator extends MultiblockGenerator{
             this.settings.refresh((CoreBasedGeneratorSettings)settings);
         }else throw new IllegalArgumentException("Passed invalid settings to Core-based generator!");
     }
+
+    @Override
+    public Settings getSettings() {
+        return settings;
+    }
+
     @Override
     public void tick(){
         //<editor-fold defaultstate="collapsed" desc="Calculate Core">
@@ -410,35 +414,6 @@ public class CoreBasedGenerator extends MultiblockGenerator{
             countIteration();
         }
     }
-    private Block applyMultiblockSpecificSettings(Multiblock currentMultiblock, Block randBlock){
-        if(multiblock instanceof UnderhaulSFR)return randBlock;//no block-specifics here!
-        if(multiblock instanceof OverhaulSFR){
-            multiblock.overhaul.fissionsfr.Block block = (multiblock.overhaul.fissionsfr.Block)randBlock;
-            if(!block.template.allRecipes.isEmpty()){
-                ArrayList<Range<multiblock.configuration.overhaul.fissionsfr.BlockRecipe>> validRecipes = new ArrayList<>(((OverhaulSFR)multiblock).getValidRecipes());
-                for(Iterator<Range<multiblock.configuration.overhaul.fissionsfr.BlockRecipe>> it = validRecipes.iterator(); it.hasNext();){
-                    Range<multiblock.configuration.overhaul.fissionsfr.BlockRecipe> next = it.next();
-                    if(!block.template.allRecipes.contains(next.obj))it.remove();
-                }
-                if(!validRecipes.isEmpty())block.recipe = rand(currentMultiblock, validRecipes);
-            }
-            return randBlock;
-        }
-        if(multiblock instanceof OverhaulMSR){
-            multiblock.overhaul.fissionmsr.Block block = (multiblock.overhaul.fissionmsr.Block)randBlock;
-            if(!block.template.allRecipes.isEmpty()){
-                ArrayList<Range<multiblock.configuration.overhaul.fissionmsr.BlockRecipe>> validRecipes = new ArrayList<>(((OverhaulMSR)multiblock).getValidRecipes());
-                for(Iterator<Range<multiblock.configuration.overhaul.fissionmsr.BlockRecipe>> it = validRecipes.iterator(); it.hasNext();){
-                    Range<multiblock.configuration.overhaul.fissionmsr.BlockRecipe> next = it.next();
-                    if(!block.template.allRecipes.contains(next.obj))it.remove();
-                }
-                if(!validRecipes.isEmpty())block.recipe = rand(currentMultiblock, validRecipes);
-            }
-            return randBlock;
-        }
-        if(multiblock instanceof OverhaulTurbine)return randBlock;//also no block-specifics!
-        throw new IllegalArgumentException("Unknown multiblock: "+multiblock.getDefinitionName());
-    }
     private void finalizeCore(Multiblock worst){
         if(worst==null)return;
         synchronized(finalCores){
@@ -467,7 +442,7 @@ public class CoreBasedGenerator extends MultiblockGenerator{
             }
         }
     }
-    private void finalize(Multiblock worst){
+    protected void finalize(Multiblock worst){
         if(worst==null)return;
         synchronized(finalMultiblocks){
         //<editor-fold defaultstate="collapsed" desc="Adding/removing final multiblocks">
@@ -494,40 +469,6 @@ public class CoreBasedGenerator extends MultiblockGenerator{
                 }
             }
         }
-    }
-    @Override
-    public void importMultiblock(Multiblock multiblock) throws MissingConfigurationEntryException{
-        multiblock.convertTo(this.multiblock.getConfiguration());
-        if(multiblock instanceof UnderhaulSFR){
-            multiblock = multiblock.copy();
-            ((UnderhaulSFR)multiblock).fuel = ((UnderhaulSFR)this.multiblock).fuel;
-            multiblock.recalculate();
-        }
-        if(!multiblock.isShapeEqual(this.multiblock))return;
-        for(Range<Block> range : settings.allowedBlocks){
-            for(Block block : ((Multiblock<Block>)multiblock).getBlocks()){
-                if(multiblock.count(block)>range.max)multiblock.action(new SetblockAction(block.x, block.y, block.z, null), true, false);
-            }
-        }
-        ALLOWED:for(Block block : ((Multiblock<Block>)multiblock).getBlocks()){
-            for(Range<Block> range : settings.allowedBlocks){
-                if(range.obj.isEqual(block))continue ALLOWED;
-            }
-            multiblock.action(new SetblockAction(block.x, block.y, block.z, null), true, false);
-        }
-        finalize(multiblock);
-    }
-    private <T extends Object> T rand(Multiblock multiblock, ArrayList<Range<T>> ranges){
-        if(ranges.isEmpty())return null;
-        for(Range<T> range : ranges){
-            if(range.min==0&&range.max==Integer.MAX_VALUE)continue;
-            if(multiblock.count(range.obj)<range.min)return range.obj;
-        }
-        Range<T> randRange = ranges.get(rand.nextInt(ranges.size()));
-        if((randRange.min!=0||randRange.max!=Integer.MAX_VALUE)&&randRange.max!=0&&multiblock.count(randRange.obj)>=randRange.max){
-            return null;
-        }
-        return randRange.obj;
     }
     private <T extends Block> T randCore(Multiblock multiblock, ArrayList<Range<T>> ranges){
         ArrayList<Range<T>> coreRanges = new ArrayList<>(ranges);

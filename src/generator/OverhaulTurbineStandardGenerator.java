@@ -365,16 +365,9 @@ public class OverhaulTurbineStandardGenerator extends MultiblockGenerator{
         }
         return randRange.obj;
     }
-    private <T extends Object> T rand(Multiblock multiblock, ArrayList<Range<T>> ranges){
-        if(ranges.isEmpty())return null;
-        for(Range<T> range : ranges){
-            if(range.min==0&&range.max==Integer.MAX_VALUE)continue;
-            if(multiblock.count(range.obj)<range.min)return range.obj;
-        }
-        Range<T> randRange = ranges.get(rand.nextInt(ranges.size()));
-        if((randRange.min!=0||randRange.max!=Integer.MAX_VALUE)&&randRange.max!=0&&multiblock.count(randRange.obj)>=randRange.max){
-            return null;
-        }
-        return randRange.obj;
+
+    @Override
+    public Settings getSettings() {
+        return settings;
     }
 }

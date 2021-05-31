@@ -48,6 +48,7 @@ public abstract class MultiblockGenerator{
             return threads.size();
         }
     }
+    public abstract Settings getSettings();
     /**
      * MULTITHREADED
      */
@@ -117,5 +118,19 @@ public abstract class MultiblockGenerator{
             if(System.nanoTime()-crashedThreads.get(uid)<=crashedThreadTime)crashed++;
         }
         return crashed;
+    }
+
+    // Useful utility functions
+    protected final <T extends Object> T rand(Multiblock multiblock, ArrayList<Range<T>> ranges) {
+        if(ranges.isEmpty())return null;
+        for(Range<T> range : ranges){
+            if(range.min==0&&range.max==Integer.MAX_VALUE)continue;
+            if(multiblock.count(range.obj)<range.min)return range.obj;
+        }
+        Range<T> randRange = ranges.get(rand.nextInt(ranges.size()));
+        if((randRange.min!=0||randRange.max!=Integer.MAX_VALUE)&&randRange.max!=0&&multiblock.count(randRange.obj)>=randRange.max){
+            return null;
+        }
+        return randRange.obj;
     }
 }

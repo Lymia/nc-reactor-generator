@@ -6,8 +6,6 @@ import multiblock.Multiblock;
 import multiblock.Range;
 import multiblock.action.SetblockAction;
 import multiblock.action.SymmetryAction;
-import multiblock.configuration.overhaul.fissionsfr.BlockRecipe;
-import multiblock.overhaul.fissionmsr.OverhaulMSR;
 import multiblock.overhaul.fissionsfr.OverhaulSFR;
 import multiblock.symmetry.Symmetry;
 import multiblock.underhaul.fissionsfr.UnderhaulSFR;
@@ -21,7 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 
-public class NoveltySearchGenerator extends MultiblockGenerator {
+public class NoveltySearchGenerator extends ReactorGeneratorCommon {
     private static final class NoveltyVector {
         private final double[] components;
         public NoveltyVector(double... components) {
@@ -110,6 +108,11 @@ public class NoveltySearchGenerator extends MultiblockGenerator {
 
     public NoveltySearchGenerator(Multiblock multiblock) {
         super(multiblock);
+    }
+
+    @Override
+    protected void finalize(Multiblock worst) {
+
     }
 
     @Override
@@ -404,53 +407,8 @@ public class NoveltySearchGenerator extends MultiblockGenerator {
         countIteration();
     }
 
-    private Block applyMultiblockSpecificSettings(Multiblock currentMultiblock, Block randBlock) {
-        if (multiblock instanceof OverhaulSFR) {
-            multiblock.overhaul.fissionsfr.Block block = (multiblock.overhaul.fissionsfr.Block) randBlock;
-            if (!block.template.allRecipes.isEmpty()) {
-                ArrayList<Range<multiblock.configuration.overhaul.fissionsfr.BlockRecipe>> validRecipes =
-                        new ArrayList<>(((OverhaulSFR) multiblock).getValidRecipes());
-                validRecipes.removeIf(next -> !block.template.allRecipes.contains(next.obj));
-                if (!validRecipes.isEmpty()) block.recipe = rand(currentMultiblock, validRecipes);
-            }
-            return randBlock;
-        }
-        if (multiblock instanceof OverhaulMSR) {
-            multiblock.overhaul.fissionmsr.Block block = (multiblock.overhaul.fissionmsr.Block) randBlock;
-            if (!block.template.allRecipes.isEmpty()) {
-                ArrayList<Range<multiblock.configuration.overhaul.fissionmsr.BlockRecipe>> validRecipes =
-                        new ArrayList<>(((OverhaulMSR) multiblock).getValidRecipes());
-                validRecipes.removeIf(next -> !block.template.allRecipes.contains(next.obj));
-                if (!validRecipes.isEmpty()) block.recipe = rand(currentMultiblock, validRecipes);
-            }
-            return randBlock;
-        }
-        return randBlock;
-    }
-
     @Override
     public void importMultiblock(Multiblock multiblock) throws MissingConfigurationEntryException {
-        multiblock.convertTo(this.multiblock.getConfiguration());
-        if (multiblock instanceof UnderhaulSFR) {
-            multiblock = multiblock.copy();
-            ((UnderhaulSFR) multiblock).fuel = ((UnderhaulSFR) this.multiblock).fuel;
-            multiblock.recalculate();
-        }
-        if (!multiblock.isShapeEqual(this.multiblock)) return;
-        for (Range<Block> range : settings.allowedBlocks) {
-            for (Block block : ((Multiblock<Block>) multiblock).getBlocks()) {
-                if (multiblock.count(block) > range.max)
-                    multiblock.action(new SetblockAction(block.x, block.y, block.z, null), true, false);
-            }
-        }
-        ALLOWED:
-        for (Block block : ((Multiblock<Block>) multiblock).getBlocks()) {
-            for (Range<Block> range : settings.allowedBlocks) {
-                if (range.obj.isEqual(block)) continue ALLOWED;
-            }
-            multiblock.action(new SetblockAction(block.x, block.y, block.z, null), true, false);
-        }
-
         // setup state
         synchronized (this) {
             var cm = (CuboidalMultiblock) multiblock.blankCopy();
@@ -474,16 +432,8 @@ public class NoveltySearchGenerator extends MultiblockGenerator {
         return array.get(rand.nextInt(array.size()));
     }
 
-    private <T extends Object> T rand(Multiblock multiblock, ArrayList<Range<T>> ranges) {
-        if (ranges.isEmpty()) return null;
-        for (Range<T> range : ranges) {
-            if (range.min == 0 && range.max == Integer.MAX_VALUE) continue;
-            if (multiblock.count(range.obj) < range.min) return range.obj;
-        }
-        Range<T> randRange = ranges.get(rand.nextInt(ranges.size()));
-        if ((randRange.min != 0 || randRange.max != Integer.MAX_VALUE) && randRange.max != 0 && multiblock.count(randRange.obj) >= randRange.max) {
-            return null;
-        }
-        return randRange.obj;
+    @Override
+    public Settings getSettings() {
+        return settings;
     }
 }
