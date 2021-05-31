@@ -1,5 +1,8 @@
-package generator;
+package generator.simple;
 import java.util.ArrayList;
+
+import generator.Priority;
+import generator.Settings;
 import multiblock.Block;
 import multiblock.Range;
 import multiblock.ppe.PostProcessingEffect;
@@ -7,7 +10,7 @@ import multiblock.symmetry.Symmetry;
 import planner.menu.component.generator.MenuComponentPostProcessingEffect;
 import planner.menu.component.generator.MenuComponentPriority;
 import planner.menu.component.generator.MenuComponentSymmetry;
-public class OverhaulTurbineStandardGeneratorSettings implements Settings{
+public class StandardGeneratorSettings implements Settings {
     public int finalMultiblocks, workingMultiblocks, timeout;
     public ArrayList<Priority> priorities = new ArrayList<>();
     public ArrayList<Symmetry> symmetries = new ArrayList<>();
@@ -15,11 +18,11 @@ public class OverhaulTurbineStandardGeneratorSettings implements Settings{
     public ArrayList<Range<Block>> allowedBlocks = new ArrayList<>();
     public float changeChancePercent;
     public boolean variableRate, lockCore, fillAir;
-    private final OverhaulTurbineStandardGenerator generator;
-    public OverhaulTurbineStandardGeneratorSettings(OverhaulTurbineStandardGenerator generator){
+    private final StandardGenerator generator;
+    public StandardGeneratorSettings(StandardGenerator generator){
         this.generator = generator;
     }
-    public void refresh(OverhaulTurbineStandardGeneratorSettings settings){
+    public void refresh(StandardGeneratorSettings settings){
         allowedBlocks = settings.allowedBlocks;
         finalMultiblocks = settings.finalMultiblocks;
         workingMultiblocks = settings.workingMultiblocks;

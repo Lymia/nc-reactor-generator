@@ -1,5 +1,8 @@
-package generator;
+package generator.search;
 
+import generator.MultiblockGenerator;
+import generator.ReactorGeneratorCommon;
+import generator.Settings;
 import multiblock.Block;
 import multiblock.CuboidalMultiblock;
 import multiblock.Multiblock;
@@ -8,7 +11,6 @@ import multiblock.action.SetblockAction;
 import multiblock.action.SymmetryAction;
 import multiblock.overhaul.fissionsfr.OverhaulSFR;
 import multiblock.symmetry.Symmetry;
-import multiblock.underhaul.fissionsfr.UnderhaulSFR;
 import planner.exception.MissingConfigurationEntryException;
 import planner.menu.component.MenuComponentLabel;
 import planner.menu.component.MenuComponentMinimaList;

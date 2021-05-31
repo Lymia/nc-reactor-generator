@@ -3,6 +3,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
 import java.util.UUID;
+
+import generator.search.NoveltySearchGenerator;
+import generator.simple.CoreBasedGenerator;
+import generator.simple.OverhaulTurbineStandardGenerator;
+import generator.simple.StandardGenerator;
 import multiblock.Block;
 import multiblock.Multiblock;
 import multiblock.Range;

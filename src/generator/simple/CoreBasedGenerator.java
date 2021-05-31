@@ -1,6 +1,11 @@
-package generator;
+package generator.simple;
 import java.util.ArrayList;
 import java.util.Iterator;
+
+import generator.MultiblockGenerator;
+import generator.Priority;
+import generator.ReactorGeneratorCommon;
+import generator.Settings;
 import multiblock.Block;
 import multiblock.CuboidalMultiblock;
 import multiblock.Multiblock;
@@ -12,7 +17,6 @@ import multiblock.overhaul.turbine.OverhaulTurbine;
 import multiblock.ppe.PostProcessingEffect;
 import multiblock.symmetry.Symmetry;
 import multiblock.underhaul.fissionsfr.UnderhaulSFR;
-import planner.exception.MissingConfigurationEntryException;
 import planner.menu.component.MenuComponentLabel;
 import planner.menu.component.MenuComponentMinimaList;
 import planner.menu.component.MenuComponentMinimalistButton;

@@ -1,5 +1,6 @@
-package generator;
+package generator.search;
 
+import generator.Settings;
 import multiblock.Block;
 import multiblock.Range;
 import multiblock.symmetry.Symmetry;
