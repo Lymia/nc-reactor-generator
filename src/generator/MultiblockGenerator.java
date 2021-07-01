@@ -18,6 +18,7 @@ public abstract class MultiblockGenerator{
         generators.add(new OverhaulTurbineStandardGenerator(null));
         generators.add(new CoreBasedGenerator(null));
         generators.add(new StandardGenerator(null));
+        generators.add(new NoveltySearchGenerator(null));
     }
     protected ArrayList<Priority> priorities;
     private Object threadronyzer = new Object();
