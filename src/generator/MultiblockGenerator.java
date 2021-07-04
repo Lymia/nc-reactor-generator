@@ -12,7 +12,7 @@ import planner.menu.component.MenuComponentMinimaList;
 public abstract class MultiblockGenerator{
     public int iterations = 0;
     public final Object iterationSynchronizer = new Object();
-    protected Random rand = new Random();
+    protected Random rand = new MersenneTwister();
     public static final ArrayList<MultiblockGenerator> generators = new ArrayList<>();
     static{
         generators.add(new OverhaulTurbineStandardGenerator(null));
