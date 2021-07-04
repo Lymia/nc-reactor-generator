@@ -1,5 +1,6 @@
 package planner.file.reader;
-
+import java.util.ArrayList;
+import java.util.Iterator;
 import multiblock.Multiblock;
 import multiblock.configuration.Configuration;
 import multiblock.configuration.underhaul.UnderhaulConfiguration;
@@ -12,10 +13,8 @@ import planner.file.NCPFFile;
 import simplelibrary.config2.Config;
 import simplelibrary.config2.ConfigList;
 import simplelibrary.config2.ConfigNumberList;
-
-import java.util.ArrayList;
-import java.util.Iterator;
 public class NCPF9Reader extends NCPF10Reader {
+    @Override
     protected byte getTargetVersion() {
         return (byte) 9;
     }
@@ -268,8 +267,7 @@ public class NCPF9Reader extends NCPF10Reader {
                 for(multiblock.configuration.underhaul.fissionsfr.PlacementRule rule : underhaulPostLoadMap.keySet()){
                     int index = underhaulPostLoadMap.get(rule);
                     if(index==0){
-                        if(rule.ruleType==multiblock.configuration.underhaul.fissionsfr.PlacementRule.RuleType.AXIAL)rule.ruleType=multiblock.configuration.underhaul.fissionsfr.PlacementRule.RuleType.AXIAL_GROUP;
-                        if(rule.ruleType==multiblock.configuration.underhaul.fissionsfr.PlacementRule.RuleType.BETWEEN)rule.ruleType=multiblock.configuration.underhaul.fissionsfr.PlacementRule.RuleType.BETWEEN_GROUP;
+                        rule.isSpecificBlock = false;
                         rule.blockType = multiblock.configuration.underhaul.fissionsfr.PlacementRule.BlockType.AIR;
                     }else{
                         rule.block = parent.underhaul.fissionSFR.allBlocks.get(index-1);
@@ -348,9 +346,8 @@ public class NCPF9Reader extends NCPF10Reader {
             for(multiblock.configuration.overhaul.fissionsfr.PlacementRule rule : overhaulSFRPostLoadMap.keySet()){
                 int index = overhaulSFRPostLoadMap.get(rule);
                 if(index==0){
-                    if(rule.ruleType==multiblock.configuration.overhaul.fissionsfr.PlacementRule.RuleType.AXIAL)rule.ruleType=multiblock.configuration.overhaul.fissionsfr.PlacementRule.RuleType.AXIAL_GROUP;
-                    if(rule.ruleType==multiblock.configuration.overhaul.fissionsfr.PlacementRule.RuleType.BETWEEN)rule.ruleType=multiblock.configuration.overhaul.fissionsfr.PlacementRule.RuleType.BETWEEN_GROUP;
-                    rule.blockType = multiblock.configuration.overhaul.fissionsfr.PlacementRule.BlockType.AIR;
+                        rule.isSpecificBlock = false;
+                        rule.blockType = multiblock.configuration.overhaul.fissionsfr.PlacementRule.BlockType.AIR;
                 }else{
                     rule.block = parent.overhaul.fissionSFR.allBlocks.get(index-1);
                 }
@@ -500,9 +497,8 @@ public class NCPF9Reader extends NCPF10Reader {
             for(multiblock.configuration.overhaul.fissionmsr.PlacementRule rule : overhaulMSRPostLoadMap.keySet()){
                 int index = overhaulMSRPostLoadMap.get(rule);
                 if(index==0){
-                    if(rule.ruleType==multiblock.configuration.overhaul.fissionmsr.PlacementRule.RuleType.AXIAL)rule.ruleType=multiblock.configuration.overhaul.fissionmsr.PlacementRule.RuleType.AXIAL_GROUP;
-                    if(rule.ruleType==multiblock.configuration.overhaul.fissionmsr.PlacementRule.RuleType.BETWEEN)rule.ruleType=multiblock.configuration.overhaul.fissionmsr.PlacementRule.RuleType.BETWEEN_GROUP;
-                    rule.blockType = multiblock.configuration.overhaul.fissionmsr.PlacementRule.BlockType.AIR;
+                        rule.isSpecificBlock = false;
+                        rule.blockType = multiblock.configuration.overhaul.fissionmsr.PlacementRule.BlockType.AIR;
                 }else{
                     rule.block = parent.overhaul.fissionMSR.allBlocks.get(index-1);
                 }
@@ -636,8 +632,7 @@ public class NCPF9Reader extends NCPF10Reader {
             for(multiblock.configuration.overhaul.turbine.PlacementRule rule : overhaulTurbinePostLoadMap.keySet()){
                 int index = overhaulTurbinePostLoadMap.get(rule);
                 if(index==0){
-                    if(rule.ruleType==multiblock.configuration.overhaul.turbine.PlacementRule.RuleType.AXIAL)rule.ruleType=multiblock.configuration.overhaul.turbine.PlacementRule.RuleType.AXIAL_GROUP;
-                    if(rule.ruleType==multiblock.configuration.overhaul.turbine.PlacementRule.RuleType.BETWEEN)rule.ruleType=multiblock.configuration.overhaul.turbine.PlacementRule.RuleType.BETWEEN_GROUP;
+                    rule.isSpecificBlock = false;
                     rule.blockType = multiblock.configuration.overhaul.turbine.PlacementRule.BlockType.CASING;
                 }else{
                     rule.block = allCoils.get(index-1);
@@ -713,8 +708,7 @@ public class NCPF9Reader extends NCPF10Reader {
             for(multiblock.configuration.overhaul.fusion.PlacementRule rule : overhaulFusionPostLoadMap.keySet()){
                 int index = overhaulFusionPostLoadMap.get(rule);
                 if(index==0){
-                    if(rule.ruleType==multiblock.configuration.overhaul.fusion.PlacementRule.RuleType.AXIAL)rule.ruleType=multiblock.configuration.overhaul.fusion.PlacementRule.RuleType.AXIAL_GROUP;
-                    if(rule.ruleType==multiblock.configuration.overhaul.fusion.PlacementRule.RuleType.BETWEEN)rule.ruleType=multiblock.configuration.overhaul.fusion.PlacementRule.RuleType.BETWEEN_GROUP;
+                    rule.isSpecificBlock = false;
                     rule.blockType = multiblock.configuration.overhaul.fusion.PlacementRule.BlockType.AIR;
                 }else{
                     rule.block = configuration.overhaul.fusion.allBlocks.get(index-1);
